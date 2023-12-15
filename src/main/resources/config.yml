@@ -40,8 +40,15 @@ COLORS:
   REWARD_NAME_COLOR: YELLOW
 
 HAS_REDEEMED_STRING: "has redeemed" # Whitespaces on the start and end of the string are added automatically.
-titleDisabled: false
+titleDisabled: false #If you disable title message for all players
 titlePermission: "chatpointsttv.view"
+
+notPlayer:
+  msg: "%player% doesn't exist and attempted a reward"
+  view: "notplayer.view"
+toggle:
+  on: "&cYou have &lenabled &ctitle reward messages!"
+  off: "&cYou have disabled title reward messages!"
 reload:
   message: "&aConfig reloaded!"
   noPerm: "&cYou lack permission"

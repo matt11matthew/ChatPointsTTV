@@ -9,11 +9,15 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.logging.Logger;
 
+import com.gospelbg.chatpointsttv.commands.ToggleRewardCommand;
 import me.matthewedevelopment.atheriallib.AtherialLib;
 import me.matthewedevelopment.atheriallib.command.AnnotationlessAtherialCommand;
+import me.matthewedevelopment.atheriallib.config.BukkitConfig;
+import me.matthewedevelopment.atheriallib.playerdata.Toggle;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.util.StringUtil;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -39,6 +43,7 @@ public class Main extends AtherialLib {
     public static Main plugin;
     public Logger log = getLogger();
     public FileConfiguration config;
+    public BukkitConfig notPlayerConfig;
     private Map<String, Object> rewards;
     private List<String> titleBlacklist = new ArrayList<String>();
     private Map<String, ChatColor> colors = new HashMap<String, ChatColor>();
@@ -49,9 +54,12 @@ public class Main extends AtherialLib {
     @Override
     public void onStart() {
         plugin = this;
+        this.notPlayerConfig = new BukkitConfig("not_player_log.yml", this);
         this.playerHandler = new PlayerHandler(this);
         this.registerListener(this.playerHandler);
+        this.profileManager.registerProfileClass(CPProfile.class);
 
+        registerCommand(new ToggleRewardCommand(this));
         registerCommand(new AnnotationlessAtherialCommand("chatpointsreload", "/chatpointsreload") {
             @Override
             public void execute(CommandSender commandSender, String[] strings) {
@@ -100,12 +108,15 @@ public class Main extends AtherialLib {
         // Register event listeners
         client.getPubSub().listenForChannelPointsRedemptionEvents(null, user_id);
         client.getEventManager().onEvent(RewardRedeemedEvent.class, event -> {
+
             String rewardTitle = event.getRedemption().getReward().getTitle();
 
             if (!titleBlacklist.contains(rewardTitle)) {
                 ChatColor isBold = config.getBoolean("REWARD_NAME_BOLD") ? ChatColor.BOLD : ChatColor.RESET;
 
                 plugin.getServer().getOnlinePlayers().forEach (p -> {
+                    CPProfile profile = CPProfile.getProfile(p);
+                    if (profile!=null&&profile.getReward()== Toggle.ON&& !this.getConfig().getBoolean("titleDisabled") &&p.hasPermission(this.getConfig().getString("titlePermission")))
                     p.sendTitle(colors.get("USER_COLOR") + event.getRedemption().getUser().getDisplayName(), config.getString("HAS_REDEEMED_STRING") + " " + isBold + colors.get("REWARD_NAME_COLOR") + rewardTitle, 10, 70, 20);
                 });
             }
@@ -132,6 +143,21 @@ public class Main extends AtherialLib {
                         text = text.trim();
 
                         final String cmd = text.replace("/", "");
+
+                        if (!action.get(1).equals("CONSOLE")){
+                            boolean player = this.playerHandler.isPlayer(action.get(1));
+                            if (!player){
+                                for (Player onlinePlayer : Bukkit.getServer().getOnlinePlayers()) {
+                                    if (onlinePlayer.hasPermission(getConfig().getString("notPlayer.view"))){
+                                        onlinePlayer.sendMessage(colorize(getConfig().getString("notPlayer.msg")).replaceAll("%player%", action.get(1)));
+                                    }
+                                    logFalse(action);
+                                }
+                                return;
+
+                            }
+
+                        }
                         log.info("Running command: \""+ cmd + "\"...");
 
                         if (action.get(1).equals("CONSOLE")) {
@@ -144,6 +170,12 @@ public class Main extends AtherialLib {
             });
         });
     }
+
+    private void logFalse(List<String> action) {
+        notPlayerConfig.getConfiguration().set("logs."+System.currentTimeMillis(), action.toString());
+        notPlayerConfig.saveConfiguration();
+    }
+
 
     @Override
     public void initDependencies() {
