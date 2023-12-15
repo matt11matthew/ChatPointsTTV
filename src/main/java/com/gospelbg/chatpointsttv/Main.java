@@ -9,8 +9,11 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.logging.Logger;
 
+import me.matthewedevelopment.atheriallib.AtherialLib;
+import me.matthewedevelopment.atheriallib.command.AnnotationlessAtherialCommand;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.util.StringUtil;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -29,7 +32,9 @@ import com.github.twitch4j.helix.domain.UserList;
 
 import com.gospelbg.chatpointsttv.Events;
 
-public class Main extends JavaPlugin {
+import static me.matthewedevelopment.atheriallib.utilities.ChatUtils.colorize;
+
+public class Main extends AtherialLib {
     private ITwitchClient client;
     public static Main plugin;
     public Logger log = getLogger();
@@ -38,9 +43,28 @@ public class Main extends JavaPlugin {
     private List<String> titleBlacklist = new ArrayList<String>();
     private Map<String, ChatColor> colors = new HashMap<String, ChatColor>();
 
+    private PlayerHandler playerHandler;
+
+
     @Override
-    public void onEnable() {
+    public void onStart() {
         plugin = this;
+        this.playerHandler = new PlayerHandler(this);
+        this.registerListener(this.playerHandler);
+
+        registerCommand(new AnnotationlessAtherialCommand("chatpointsreload", "/chatpointsreload") {
+            @Override
+            public void execute(CommandSender commandSender, String[] strings) {
+                if (!commandSender.hasPermission("chatpointsreload.reload")) {
+                    commandSender.sendMessage(colorize(getConfig().getString("reload.noPerm")));
+                    return;
+                }
+
+                reloadConfig();
+                config = getConfig();
+                commandSender.sendMessage(colorize(getConfig().getString("reload.message")));
+            }
+        });
         // Get the latest config after saving the default if missing
         this.saveDefaultConfig();
         config = getConfig();
@@ -122,7 +146,12 @@ public class Main extends JavaPlugin {
     }
 
     @Override
-    public void onDisable() {
+    public void initDependencies() {
+
+    }
+
+    @Override
+    public void onStop() {
         if (client != null) {
             client.getChat().leaveChannel(config.getString("CHANNEL_USERNAME"));
             client.getEventManager().close();

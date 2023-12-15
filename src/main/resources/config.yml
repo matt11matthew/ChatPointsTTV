@@ -40,7 +40,11 @@ COLORS:
   REWARD_NAME_COLOR: YELLOW
 
 HAS_REDEEMED_STRING: "has redeemed" # Whitespaces on the start and end of the string are added automatically.
-
+titleDisabled: false
+titlePermission: "chatpointsttv.view"
+reload:
+  message: "&aConfig reloaded!"
+  noPerm: "&cYou lack permission"
 # Add here the reward names that you don't want to be prompted on an in-game title.
 TITLE_BLACKLIST:
-  - 
+  -
