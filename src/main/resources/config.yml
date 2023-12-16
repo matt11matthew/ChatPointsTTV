@@ -8,7 +8,7 @@ CHANNEL_USERNAME: {YOUR CHANNEL}
 # Configure your channel rewards.
 # Add lines as many times as needed. Replace {REWARD_NAME} as your reward's name.
 # {REWARD_NAME}: {ACTION}
-
+titleDisabledMSG: "&cTitles are disabled in cofiguration file. To toggle visability enable in config"
 # For the action, follow this format:
 #     ACTION: "SPAWN {ENTITY_NAME_IN_CAPS} {AMOUNT}"
 #     ACTION: "RUN {PLAYER_NAME / CONSOLE} {COMMAND}"

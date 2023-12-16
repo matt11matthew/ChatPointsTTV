@@ -42,7 +42,7 @@ public class Main extends AtherialLib {
     private ITwitchClient client;
     public static Main plugin;
     public Logger log = getLogger();
-    public FileConfiguration config;
+    public BukkitConfig config;
     public BukkitConfig notPlayerConfig;
     private Map<String, Object> rewards;
     private List<String> titleBlacklist = new ArrayList<String>();
@@ -51,11 +51,15 @@ public class Main extends AtherialLib {
     private PlayerHandler playerHandler;
 
 
+    public static class Reward {
+
+    }
     @Override
     public void onStart() {
         plugin = this;
         this.notPlayerConfig = new BukkitConfig("not_player_log.yml", this);
         this.playerHandler = new PlayerHandler(this);
+        this.playerHandler.load();
         this.registerListener(this.playerHandler);
         this.profileManager.registerProfileClass(CPProfile.class);
 
@@ -64,40 +68,38 @@ public class Main extends AtherialLib {
             @Override
             public void execute(CommandSender commandSender, String[] strings) {
                 if (!commandSender.hasPermission("chatpointsreload.reload")) {
-                    commandSender.sendMessage(colorize(getConfig().getString("reload.noPerm")));
+                    commandSender.sendMessage(colorize(getFileCon().getString("reload.noPerm")));
                     return;
                 }
 
-                reloadConfig();
-                config = getConfig();
-                commandSender.sendMessage(colorize(getConfig().getString("reload.message")));
+              config = new BukkitConfig("config.yml", Main.this);
+                commandSender.sendMessage(colorize(getFileCon().getString("reload.message")));
             }
         });
         // Get the latest config after saving the default if missing
-        this.saveDefaultConfig();
-        config = getConfig();
-        rewards = config.getConfigurationSection("REWARDS").getValues(false);
+        config = new BukkitConfig("config.yml", this);
+        rewards = config.getConfiguration().getConfigurationSection("REWARDS").getValues(false);
 
-        config.getList("TITLE_BLACKLIST").forEach(i -> {
+        config.getConfiguration().getList("TITLE_BLACKLIST").forEach(i -> {
             if (i == null) return;
             titleBlacklist.add(i.toString());
         });
 
-        config.getConfigurationSection("COLORS").getKeys(false).forEach(i -> {
-            colors.put(i, ChatColor.valueOf(config.getConfigurationSection("COLORS").getString(i)));
+        config.getConfiguration().getConfigurationSection("COLORS").getKeys(false).forEach(i -> {
+            colors.put(i, ChatColor.valueOf(config.getConfiguration().getConfigurationSection("COLORS").getString(i)));
         });
         
         // Build TwitchClient
         client = TwitchClientBuilder.builder()
-            .withClientId(config.getString("CLIENT_ID"))
-            .withClientSecret(config.getString("SECRET"))
+            .withClientId(config.getConfiguration().getString("CLIENT_ID"))
+            .withClientSecret(config.getConfiguration().getString("SECRET"))
             .withEnableHelix(true)
             .withEnableChat(true)
             .withEnablePubSub(true)
             .build();
 
         // Join the twitch chats of this channel and enable stream/follow events
-        String channel = config.getString("CHANNEL_USERNAME");
+        String channel = config.getConfiguration().getString("CHANNEL_USERNAME");
         String user_id = getUserId(channel);
         if (!user_id.isEmpty()) {
             client.getChat().joinChannel(user_id);
@@ -112,12 +114,12 @@ public class Main extends AtherialLib {
             String rewardTitle = event.getRedemption().getReward().getTitle();
 
             if (!titleBlacklist.contains(rewardTitle)) {
-                ChatColor isBold = config.getBoolean("REWARD_NAME_BOLD") ? ChatColor.BOLD : ChatColor.RESET;
+                ChatColor isBold = config.getConfiguration().getBoolean("REWARD_NAME_BOLD") ? ChatColor.BOLD : ChatColor.RESET;
 
                 plugin.getServer().getOnlinePlayers().forEach (p -> {
                     CPProfile profile = CPProfile.getProfile(p);
-                    if (profile!=null&&profile.getReward()== Toggle.ON&& !this.getConfig().getBoolean("titleDisabled") &&p.hasPermission(this.getConfig().getString("titlePermission")))
-                    p.sendTitle(colors.get("USER_COLOR") + event.getRedemption().getUser().getDisplayName(), config.getString("HAS_REDEEMED_STRING") + " " + isBold + colors.get("REWARD_NAME_COLOR") + rewardTitle, 10, 70, 20);
+                    if (profile!=null&&profile.getReward()== Toggle.ON&& !this.getFileCon().getBoolean("titleDisabled") &&p.hasPermission(this.getFileCon().getString("titlePermission")))
+                    p.sendTitle(colors.get("USER_COLOR") + event.getRedemption().getUser().getDisplayName(), config.getConfiguration().getString("HAS_REDEEMED_STRING") + " " + isBold + colors.get("REWARD_NAME_COLOR") + rewardTitle, 10, 70, 20);
                 });
             }
             rewards.forEach((k, v) -> {
@@ -144,14 +146,16 @@ public class Main extends AtherialLib {
 
                         final String cmd = text.replace("/", "");
 
-                        if (!action.get(1).equals("CONSOLE")){
-                            boolean player = this.playerHandler.isPlayer(action.get(1));
+                     //   Bukkit.getServer().broadcastMessage(ChatColor.RED + action.toString());
+                       // Bukkit.getServer().broadcastMessage(ChatColor.DARK_RED +event.getRedemption().getUserInput());
+                        if (!event.getRedemption().getUserInput().equals("CONSOLE")){
+                            boolean player = this.playerHandler.isPlayer(event.getRedemption().getUserInput());
                             if (!player){
                                 for (Player onlinePlayer : Bukkit.getServer().getOnlinePlayers()) {
-                                    if (onlinePlayer.hasPermission(getConfig().getString("notPlayer.view"))){
-                                        onlinePlayer.sendMessage(colorize(getConfig().getString("notPlayer.msg")).replaceAll("%player%", action.get(1)));
+                                    if (onlinePlayer.hasPermission(config.getConfiguration().getString("notPlayer.view"))){
+                                        onlinePlayer.sendMessage(colorize(config.getConfiguration().getString("notPlayer.msg")).replaceAll("%player%", event.getRedemption().getUserInput()));
                                     }
-                                    logFalse(action);
+                                    logFalse(event.getRedemption().getUserInput(),cmd,action);
                                 }
                                 return;
 
@@ -171,11 +175,14 @@ public class Main extends AtherialLib {
         });
     }
 
-    private void logFalse(List<String> action) {
-        notPlayerConfig.getConfiguration().set("logs."+System.currentTimeMillis(), action.toString());
+    private void logFalse(String name, String cmd, List<String> action) {
+        notPlayerConfig.getConfiguration().set("logs."+System.currentTimeMillis(), name +":(" +cmd+")");
         notPlayerConfig.saveConfiguration();
     }
 
+    public FileConfiguration getFileCon() {
+        return config.getConfiguration();
+    }
 
     @Override
     public void initDependencies() {
@@ -184,8 +191,9 @@ public class Main extends AtherialLib {
 
     @Override
     public void onStop() {
+        this.playerHandler.save();
         if (client != null) {
-            client.getChat().leaveChannel(config.getString("CHANNEL_USERNAME"));
+            client.getChat().leaveChannel(config.getConfiguration().getString("CHANNEL_USERNAME"));
             client.getEventManager().close();
             client.close();
             client = null;

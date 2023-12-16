@@ -6,6 +6,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -25,6 +26,10 @@ public class PlayerHandler implements Listener {
     public void onPlayerJoin(PlayerJoinEvent event) {
         this.playersBukkitConfig.getConfiguration().set("players."+event.getPlayer().getName().toLowerCase(), event.getPlayer().getUniqueId().toString());
         this.playersBukkitConfig.saveConfiguration();
+        if (uuidMap==null){
+            load();
+            return;
+        }
         if (!this.uuidMap.containsKey(event.getPlayer().getName().toLowerCase())){
             this.uuidMap.put(event.getPlayer().getName().toLowerCase(),event.getPlayer().getUniqueId());
         } else {
@@ -52,7 +57,11 @@ public class PlayerHandler implements Listener {
     }
 
     public void load() {
+        if (uuidMap==null)uuidMap=new HashMap<>();
         this.playersBukkitConfig = new BukkitConfig("name_players.yml", main);
+        for (String players : playersBukkitConfig.getConfiguration().getConfigurationSection("players").getKeys(false)) {
+            uuidMap.put(players, UUID.fromString( playersBukkitConfig.getConfiguration().getString("players."+players)));
+        }
     }
 
     public void save() {

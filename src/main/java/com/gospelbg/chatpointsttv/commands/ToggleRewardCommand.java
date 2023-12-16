@@ -25,8 +25,14 @@ public class ToggleRewardCommand  extends AnnotationlessAtherialCommand {
     public void execute(CommandSender sender, String[] args) {
         if (!(sender instanceof Player)) return;
 
-        if (!sender.hasPermission(this.main.getConfig().getString("titlePermission"))) {
-            sender.sendMessage(colorize(main.getConfig().getString("reload.noPerm")));
+        if (!sender.hasPermission(this.main.getFileCon().getString("titlePermission"))) {
+            sender.sendMessage(colorize(main.getFileCon().getString("reload.noPerm")));
+            return;
+
+
+        }
+        if (this.main.getFileCon().getBoolean("titleDisabled")) {
+            sender.sendMessage(colorize(main.getFileCon().getString("titleDisabledMSG")));
             return;
         }
         Player player = (Player) sender;
@@ -36,10 +42,10 @@ public class ToggleRewardCommand  extends AnnotationlessAtherialCommand {
         switch (toggle){
 
             case ON:
-                sender.sendMessage(colorize(main.getConfig().getString("toggle.on")));
+                sender.sendMessage(colorize(main.getFileCon().getString("toggle.on", "&cYou have &lenabled &ctitle reward messages!")));
                 break;
             case OFF:
-                sender.sendMessage(colorize(main.getConfig().getString("toggle.off")));
+                sender.sendMessage(colorize(main.getFileCon().getString("toggle.off", "&cYou have disabled title reward messages!")));
                 break;
         }
     }
