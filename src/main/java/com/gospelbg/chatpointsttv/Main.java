@@ -3,7 +3,6 @@ package com.gospelbg.chatpointsttv;
 import java.lang.Integer;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Dictionary;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
@@ -18,23 +17,13 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.util.StringUtil;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.EntityType;
-import org.bukkit.scheduler.BukkitScheduler;
-import org.bukkit.configuration.ConfigurationSection;
 
 import com.github.twitch4j.ITwitchClient;
 import com.github.twitch4j.TwitchClientBuilder;
-import com.github.twitch4j.chat.TwitchChatBuilder;
 import com.github.twitch4j.pubsub.events.RewardRedeemedEvent;
-import com.github.twitch4j.auth.TwitchAuth;
-import com.github.twitch4j.auth.providers.TwitchIdentityProvider;
-import com.github.philippheuer.credentialmanager.domain.OAuth2Credential;
 import com.github.twitch4j.helix.domain.UserList;
-
-import com.gospelbg.chatpointsttv.Events;
 
 import static me.matthewedevelopment.atheriallib.utilities.ChatUtils.colorize;
 
@@ -44,7 +33,7 @@ public class Main extends AtherialLib {
     public Logger log = getLogger();
     public BukkitConfig config;
     public BukkitConfig notPlayerConfig;
-    private Map<String, Object> rewards;
+    private Map<String, Reward> rewards;
     private List<String> titleBlacklist = new ArrayList<String>();
     private Map<String, ChatColor> colors = new HashMap<String, ChatColor>();
 
@@ -52,7 +41,22 @@ public class Main extends AtherialLib {
 
 
     public static class Reward {
+        private String name;
+        private List<String> commands;
 
+
+        public Reward(String name, List<String> commands) {
+            this.name = name;
+            this.commands = commands;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public List<String> getCommands() {
+            return commands;
+        }
     }
     @Override
     public void onStart() {
@@ -78,7 +82,19 @@ public class Main extends AtherialLib {
         });
         // Get the latest config after saving the default if missing
         config = new BukkitConfig("config.yml", this);
-        rewards = config.getConfiguration().getConfigurationSection("REWARDS").getValues(false);
+
+        this.rewards = new HashMap<>();
+        for (String key : config.getConfiguration().getConfigurationSection("REWARDS").getKeys(false)) {
+            List<String> rewards = new ArrayList<>();
+            if (config.getConfiguration().isList("REWARDS." +key)){
+                rewards.addAll(config.getConfiguration().getStringList("REWARDS."+key));
+            } else {
+                rewards.add(config.getConfiguration().getString("REWARDS."+key));
+
+            }
+            this.rewards.put(key, new Reward(key, rewards));
+
+        };
 
         config.getConfiguration().getList("TITLE_BLACKLIST").forEach(i -> {
             if (i == null) return;
@@ -122,56 +138,110 @@ public class Main extends AtherialLib {
                     p.sendTitle(colors.get("USER_COLOR") + event.getRedemption().getUser().getDisplayName(), config.getConfiguration().getString("HAS_REDEEMED_STRING") + " " + isBold + colors.get("REWARD_NAME_COLOR") + rewardTitle, 10, 70, 20);
                 });
             }
-            rewards.forEach((k, v) -> {
-                if (k.toString().equals(rewardTitle)) {
-                    log.info("Claimed Reward" + rewardTitle + "!");
-                    if (v.toString().startsWith("SPAWN")) {
-                        log.info("Spawning...");
-                        List<String> action = Arrays.asList(v.toString().split(" "));
-                        Bukkit.getScheduler().runTask(this, new Runnable() {public void run() {Events.spawnMob(EntityType.fromName(action.get(1)), Integer.valueOf(action.get(2)));}});
-                    } else if (v.toString().startsWith("RUN")) {
-                        List<String> action = Arrays.asList(v.toString().split(" "));
-                        String text = "";
-                        for (int i = 0; i < action.size(); i++) {
-                            if (i == 0 | i == 1) continue;
+            for (String k : rewards.keySet()) {
+                Reward reward = rewards.get(k);
 
-                            if (action.get(i).equals("{TEXT}")) {
-                                text += " " + event.getRedemption().getUserInput();
-                                continue;
-                            }
+                for (String v : reward.getCommands()) {
+                    if (k.toString().equals(rewardTitle)) {
+                        log.info("Claimed Reward" + rewardTitle + "!");
+                        if (v.toString().startsWith("SPAWN")) {
+                            log.info("Spawning...");
+                            List<String> action = Arrays.asList(v.toString().split(" "));
+                            Bukkit.getScheduler().runTask(this, new Runnable() {public void run() {Events.spawnMob(EntityType.fromName(action.get(1)), Integer.valueOf(action.get(2)));}});
+                        } else if (v.toString().startsWith("RUN")) {
+                            List<String> action = Arrays.asList(v.toString().split(" "));
+                            String text = "";
+                            for (int i = 0; i < action.size(); i++) {
+                                if (i == 0 | i == 1) continue;
 
-                            text += " " + action.get(i);
-                        }
-                        text = text.trim();
-
-                        final String cmd = text.replace("/", "");
-
-                     //   Bukkit.getServer().broadcastMessage(ChatColor.RED + action.toString());
-                       // Bukkit.getServer().broadcastMessage(ChatColor.DARK_RED +event.getRedemption().getUserInput());
-                        if (!event.getRedemption().getUserInput().equals("CONSOLE")){
-                            boolean player = this.playerHandler.isPlayer(event.getRedemption().getUserInput());
-                            if (!player){
-                                for (Player onlinePlayer : Bukkit.getServer().getOnlinePlayers()) {
-                                    if (onlinePlayer.hasPermission(config.getConfiguration().getString("notPlayer.view"))){
-                                        onlinePlayer.sendMessage(colorize(config.getConfiguration().getString("notPlayer.msg")).replaceAll("%player%", event.getRedemption().getUserInput()));
-                                    }
-                                    logFalse(event.getRedemption().getUserInput(),cmd,action);
+                                if (action.get(i).equals("{TEXT}")) {
+                                    text += " " + event.getRedemption().getUserInput();
+                                    continue;
                                 }
-                                return;
+
+                                text += " " + action.get(i);
+                            }
+                            text = text.trim();
+
+                            final String cmd = text.replace("/", "");
+
+                            //   Bukkit.getServer().broadcastMessage(ChatColor.RED + action.toString());
+                            // Bukkit.getServer().broadcastMessage(ChatColor.DARK_RED +event.getRedemption().getUserInput());
+                            if (!event.getRedemption().getUserInput().equals("CONSOLE")){
+                                boolean player = this.playerHandler.isPlayer(event.getRedemption().getUserInput());
+                                if (!player){
+                                    for (Player onlinePlayer : Bukkit.getServer().getOnlinePlayers()) {
+                                        if (onlinePlayer.hasPermission(config.getConfiguration().getString("notPlayer.view"))){
+                                            onlinePlayer.sendMessage(colorize(config.getConfiguration().getString("notPlayer.msg")).replaceAll("%player%", event.getRedemption().getUserInput()));
+                                        }
+                                        logFalse(event.getRedemption().getUserInput(),cmd,action);
+                                    }
+                                    return;
+
+                                }
 
                             }
+                            log.info("Running command: \""+ cmd + "\"...");
 
-                        }
-                        log.info("Running command: \""+ cmd + "\"...");
-
-                        if (action.get(1).equals("CONSOLE")) {
-                            Bukkit.getScheduler().runTask(this, new Runnable() {public void run() {Events.runCommand(Bukkit.getServer().getConsoleSender(), cmd);}});
-                        } else {
-                            Bukkit.getScheduler().runTask(this, new Runnable() {public void run() {Events.runCommand(Bukkit.getPlayer(action.get(1)), cmd);}});
+                            if (action.get(1).equals("CONSOLE")) {
+                                Bukkit.getScheduler().runTask(this, new Runnable() {public void run() {Events.runCommand(Bukkit.getServer().getConsoleSender(), cmd);}});
+                            } else {
+                                Bukkit.getScheduler().runTask(this, new Runnable() {public void run() {Events.runCommand(Bukkit.getPlayer(action.get(1)), cmd);}});
+                            }
                         }
                     }
                 }
-            });
+            }
+//            rewards.forEach((k, v) -> {
+//                if (k.toString().equals(rewardTitle)) {
+//                    log.info("Claimed Reward" + rewardTitle + "!");
+//                    if (v.toString().startsWith("SPAWN")) {
+//                        log.info("Spawning...");
+//                        List<String> action = Arrays.asList(v.toString().split(" "));
+//                        Bukkit.getScheduler().runTask(this, new Runnable() {public void run() {Events.spawnMob(EntityType.fromName(action.get(1)), Integer.valueOf(action.get(2)));}});
+//                    } else if (v.toString().startsWith("RUN")) {
+//                        List<String> action = Arrays.asList(v.toString().split(" "));
+//                        String text = "";
+//                        for (int i = 0; i < action.size(); i++) {
+//                            if (i == 0 | i == 1) continue;
+//
+//                            if (action.get(i).equals("{TEXT}")) {
+//                                text += " " + event.getRedemption().getUserInput();
+//                                continue;
+//                            }
+//
+//                            text += " " + action.get(i);
+//                        }
+//                        text = text.trim();
+//
+//                        final String cmd = text.replace("/", "");
+//
+//                     //   Bukkit.getServer().broadcastMessage(ChatColor.RED + action.toString());
+//                       // Bukkit.getServer().broadcastMessage(ChatColor.DARK_RED +event.getRedemption().getUserInput());
+//                        if (!event.getRedemption().getUserInput().equals("CONSOLE")){
+//                            boolean player = this.playerHandler.isPlayer(event.getRedemption().getUserInput());
+//                            if (!player){
+//                                for (Player onlinePlayer : Bukkit.getServer().getOnlinePlayers()) {
+//                                    if (onlinePlayer.hasPermission(config.getConfiguration().getString("notPlayer.view"))){
+//                                        onlinePlayer.sendMessage(colorize(config.getConfiguration().getString("notPlayer.msg")).replaceAll("%player%", event.getRedemption().getUserInput()));
+//                                    }
+//                                    logFalse(event.getRedemption().getUserInput(),cmd,action);
+//                                }
+//                                return;
+//
+//                            }
+//
+//                        }
+//                        log.info("Running command: \""+ cmd + "\"...");
+//
+//                        if (action.get(1).equals("CONSOLE")) {
+//                            Bukkit.getScheduler().runTask(this, new Runnable() {public void run() {Events.runCommand(Bukkit.getServer().getConsoleSender(), cmd);}});
+//                        } else {
+//                            Bukkit.getScheduler().runTask(this, new Runnable() {public void run() {Events.runCommand(Bukkit.getPlayer(action.get(1)), cmd);}});
+//                        }
+//                    }
+//                }
+//            });
         });
     }
 

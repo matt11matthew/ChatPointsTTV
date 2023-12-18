@@ -17,7 +17,10 @@ titleDisabledMSG: "&cTitles are disabled in cofiguration file. To toggle visabil
 #     {TEXT}
 
 REWARDS:
-  {REWARD NAME}: {ACTION}
+  "Live Key (Viewer SMP):":
+    - "RUN CONSOLE coin give {TEXT} 1000"
+    - "RUN CONSOLE coin give {TEXT} 10000"
+
 
 # Customize the in-game title.
 # You can use the following options:
